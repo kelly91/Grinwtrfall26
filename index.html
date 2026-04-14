@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grin — Liquidation Preference Waterfall</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&family=DM+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --navy:#031738;
+  --cream:#FFF5E6;
+  --white:#ffffff;
+  --navy-d:#071f45;
+  --navy-40:rgba(3,23,56,0.4);
+  --navy-20:rgba(3,23,56,0.20);
+  --navy-12:rgba(3,23,56,0.12);
+  --navy-06:rgba(3,23,56,0.06);
+
+  /* tier colors — navy gradient, GF inverted to cream */
+  --c-b:#031738;
+  --c-a2o:#1E3A5F;
+  --c-a2g:#FFF5E6;
+  --c-a1:#3B5070;
+  --c-a:#5A6E84;
+  --c-s:#8A9BAC;
+}
+
+html{background:var(--cream)}
+body{font-family:'DM Sans',sans-serif;font-weight:400;color:var(--navy);background:var(--cream);font-size:14px;line-height:1.6}
+
+/* ─── Header ─── */
+header{background:var(--navy);padding:22px 40px 20px;display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.h-firm{font-family:'Playfair Display',serif;font-size:11px;font-weight:400;color:rgba(255,245,230,0.45);letter-spacing:.14em;text-transform:uppercase;margin-bottom:5px}
+.h-title{font-family:'Playfair Display',serif;font-size:22px;font-weight:500;color:var(--cream);line-height:1.2}
+.h-meta{font-size:11px;color:rgba(255,245,230,0.35);line-height:1.8;text-align:right}
+
+/* ─── Main ─── */
+main{max-width:880px;margin:0 auto;padding:28px 20px 56px}
+
+/* ─── Context ─── */
+.ctx{background:var(--white);border-left:3px solid var(--navy);border-radius:0 5px 5px 0;padding:14px 18px;margin-bottom:24px;font-size:13px;line-height:1.65;color:var(--navy)}
+.ctx strong{font-weight:500}
+
+/* ─── Tool card ─── */
+.card{background:var(--white);border:1px solid var(--navy-12);border-radius:8px;overflow:hidden;margin-bottom:16px}
+.card-head{background:var(--navy-06);border-bottom:1px solid var(--navy-12);padding:10px 18px;font-size:10.5px;font-weight:500;letter-spacing:.09em;text-transform:uppercase;color:var(--navy-40)}
+.card-body{padding:20px}
+
+/* ─── Main grid ─── */
+.tool-grid{display:grid;grid-template-columns:190px 1fr;gap:24px;align-items:start}
+
+/* ─── TOWER ─── */
+.tower-wrap{position:relative;width:190px;user-select:none}
+.tower{position:relative;width:100%;overflow:hidden;border-radius:6px 6px 0 0}
+.tier{position:relative;width:100%;display:flex;align-items:center;padding:0 10px;border-top:1px solid rgba(255,255,255,0.12);min-height:24px;transition:background .05s}
+.tier-inner{display:flex;flex-direction:column;gap:1px;pointer-events:none}
+.tier-name{font-size:11px;font-weight:500;color:rgba(255,255,255,0.9);line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tier-amt{font-family:'DM Mono',monospace;font-size:10.5px;color:rgba(255,255,255,0.65);white-space:nowrap}
+.tier-sub{font-size:9.5px;color:rgba(255,255,255,0.45);white-space:nowrap}
+.tower-base{height:6px;background:var(--navy-d);border-radius:0 0 6px 6px}
+.tower-note{font-size:10px;color:var(--navy-40);text-align:center;margin-top:6px}
+
+/* Unpaid overlay */
+.unpaid-ovl{position:absolute;top:0;left:0;right:0;background:rgba(3,23,56,0.42);pointer-events:none;transition:height .06s;border-radius:6px 6px 0 0;backdrop-filter:none}
+
+/* Exit line */
+.exit-line{position:absolute;left:-8px;right:-8px;height:2px;background:var(--cream);box-shadow:0 0 0 1.5px var(--navy-20);pointer-events:none;z-index:10;transition:top .06s}
+.exit-pill{position:absolute;right:calc(100% + 6px);top:50%;transform:translateY(-50%);background:var(--navy);color:var(--cream);font-family:'DM Mono',monospace;font-size:9.5px;padding:2px 6px;border-radius:3px;white-space:nowrap;font-weight:400}
+
+/* Threshold ticks */
+.tick{position:absolute;left:-20px;width:12px;height:1.5px;background:var(--navy-40);z-index:5}
+.tick-label{position:absolute;right:calc(100% + 22px);font-family:'DM Mono',monospace;font-size:9px;color:var(--navy-40);white-space:nowrap;transform:translateY(-50%);top:50%}
+
+/* ─── Controls ─── */
+.slider-row{display:flex;gap:10px;align-items:center;margin-bottom:5px}
+.slider-row input[type=range]{flex:1;accent-color:var(--navy);height:4px;cursor:pointer}
+.num-input{display:flex;align-items:center;gap:4px}
+.num-input input{width:70px;padding:5px 8px;border:1px solid var(--navy-12);border-radius:4px;font-family:'DM Mono',monospace;font-size:13px;color:var(--navy);background:var(--white);text-align:right;outline:none}
+.num-input input:focus{border-color:var(--navy)}
+.num-unit{font-size:12px;color:var(--navy-40)}
+.slider-ctx{font-size:11.5px;color:var(--navy-40);margin-bottom:12px;display:flex;gap:16px;flex-wrap:wrap}
+
+/* ─── Zone indicator ─── */
+.zone-box{border-radius:6px;padding:12px 14px;margin-bottom:14px;transition:background .1s,border .1s;border:1px solid transparent}
+.zone-box.z-zero{background:var(--cream);border-color:var(--navy-20)}
+.zone-box.z-partial{background:var(--cream);border-left:3px solid var(--navy);border-color:var(--navy-20)}
+.zone-box.z-full{background:var(--navy);border-color:var(--navy)}
+.zone-box.z-common{background:var(--navy);border-color:var(--navy)}
+.zone-icon{font-size:18px;margin-bottom:4px}
+.zone-title{font-size:13px;font-weight:500;margin-bottom:2px}
+.zone-desc{font-size:12px;line-height:1.5;color:var(--navy-40)}
+.z-zero .zone-title{color:var(--navy)}
+.z-partial .zone-title{color:var(--navy)}
+.z-full .zone-title{color:var(--cream)}
+.z-full .zone-desc{color:rgba(255,245,230,0.6)}
+.z-common .zone-title{color:var(--cream)}
+.z-common .zone-desc{color:rgba(255,245,230,0.6)}
+
+/* ─── Metric cards ─── */
+.mc-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:14px}
+.mc{background:var(--cream);border:1px solid var(--navy-12);border-radius:5px;padding:10px 12px}
+.mc.gf{background:var(--navy);border-color:var(--navy)}
+.mc-l{font-size:10px;font-weight:500;letter-spacing:.07em;text-transform:uppercase;color:var(--navy-40);margin-bottom:4px}
+.mc-v{font-family:'DM Mono',monospace;font-size:16px;color:var(--navy);line-height:1.2}
+.mc.gf .mc-v{color:var(--cream)}
+.mc.gf .mc-l{color:rgba(255,245,230,0.5)}
+.mc-s{font-size:10px;color:var(--navy-40);margin-top:2px}
+
+/* Toggle */
+.toggle-row{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--navy-40);margin-bottom:14px}
+.toggle-row input{accent-color:var(--navy);cursor:pointer}
+
+/* Progress bars */
+.prog-section{margin-top:2px}
+.prog-label-row{display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px}
+.prog-label{color:var(--navy-40)}
+.prog-val{font-family:'DM Mono',monospace;font-weight:400}
+.prog-bar{height:6px;background:var(--navy-12);border-radius:3px;margin-bottom:9px;overflow:hidden}
+.prog-fill{height:100%;border-radius:3px;transition:width .06s}
+
+/* ─── Signals row ─── */
+.signals{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:16px}
+.sig{background:var(--white);border:1px solid var(--navy-12);border-radius:6px;padding:12px 14px;position:relative;overflow:hidden}
+.sig::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.sig.sig-bad::before{background:var(--navy)}
+.sig.sig-warn::before{background:var(--navy-40)}
+.sig.sig-neutral::before{background:var(--navy-40)}
+.sig-icon{font-size:14px;margin-bottom:5px}
+.sig-label{font-size:9.5px;font-weight:500;letter-spacing:.07em;text-transform:uppercase;color:var(--navy-40);margin-bottom:4px}
+.sig-main{font-family:'DM Mono',monospace;font-size:13px;font-weight:400;color:var(--navy);line-height:1.3;margin-bottom:3px}
+.sig-sub{font-size:10.5px;color:var(--navy-40);line-height:1.4}
+.sig-bad .sig-main{color:var(--navy)}
+.sig-warn .sig-main{color:var(--navy)}
+
+/* ─── Recommendation panel ─── */
+.rec-panel{background:var(--navy);border-radius:8px;padding:18px 20px;margin-bottom:16px;display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center}
+.rec-label{font-size:10px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,245,230,0.45);margin-bottom:4px}
+.rec-value{font-family:'Playfair Display',serif;font-size:22px;color:var(--cream);margin-bottom:3px}
+.rec-range{font-size:12px;color:rgba(255,245,230,0.5)}
+.rec-right{text-align:right}
+.rec-pw-label{font-size:10px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,245,230,0.45);margin-bottom:4px}
+.rec-pw-val{font-family:'DM Mono',monospace;font-size:16px;color:rgba(255,245,230,0.75)}
+.rec-pw-sub{font-size:10px;color:rgba(255,245,230,0.35);margin-top:2px}
+
+/* ─── Fund split ─── */
+.fund-split{display:flex;gap:10px;margin-top:10px}
+.fund-pill{font-size:11px;background:rgba(255,245,230,0.08);border:1px solid rgba(255,245,230,0.12);border-radius:4px;padding:5px 10px;color:rgba(255,245,230,0.55);font-family:'DM Mono',monospace}
+
+/* ─── Scenarios ─── */
+.scen-tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.scen-tbl th{text-align:left;padding:5px 10px;font-size:10px;font-weight:500;letter-spacing:.07em;text-transform:uppercase;color:var(--navy-40);border-bottom:1px solid var(--navy-12);white-space:nowrap}
+.scen-tbl td{padding:7px 10px;border-bottom:1px solid var(--navy-06);color:var(--navy);vertical-align:middle}
+.scen-tbl tbody tr:last-child td{border-bottom:none}
+.scen-foot td{border-top:1px solid var(--navy-12);font-weight:500;padding:8px 10px}
+.dmono{font-family:'DM Mono',monospace;font-size:11.5px}
+.muted{color:var(--navy-40)}
+
+/* ─── Footer ─── */
+footer{background:var(--navy);padding:16px 40px}
+.foot-txt{font-size:10.5px;color:rgba(255,245,230,0.3);line-height:1.7}
+
+@media(max-width:620px){
+  header{padding:16px 16px 14px}
+  main{padding:18px 14px 40px}
+  .tool-grid{grid-template-columns:1fr;gap:20px}
+  .tower-wrap{width:100%;max-width:240px;margin:0 auto}
+  footer{padding:14px 16px}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <p class="h-firm">Good Friends Venture Capital · Fund I</p>
+    <h1 class="h-title">Grin — Liquidation Preference Waterfall</h1>
+  </div>
+  <div class="h-meta">April 14, 2026<br>Cap table: Jan 10, 2025</div>
+</header>
+
+<main>
+
+<div class="ctx">
+  GF invested <strong>$1.0M</strong> in Grin's Series A-2 (May 2021). The total preference stack is <strong>$150.9M</strong> — $112.7M of Series B (Lone Pine, 53%) sits senior to GF's position. The going-concern multiple alone ($217M at 15&times; PitchBook ARR) does not account for this structure. The tower shows who gets paid, in what order, at any exit.
+</div>
+
+<div class="signals">
+  <div class="sig sig-bad">
+    <p class="sig-label">ARR trajectory</p>
+    <p class="sig-main">$30M &rarr; $9.7M</p>
+    <p class="sig-sub">68% decline since Series B close (Oct 2021). Now below entry-point ARR.</p>
+  </div>
+  <div class="sig sig-bad">
+    <p class="sig-label">Workforce reductions</p>
+    <p class="sig-main">3 layoff cycles</p>
+    <p class="sig-sub">Nov 2022 &middot; Mar 2023 &middot; Apr 2024. Sustained contraction over 30 months.</p>
+  </div>
+  <div class="sig sig-warn">
+    <p class="sig-label">Last institutional raise</p>
+    <p class="sig-main">50+ months ago</p>
+    <p class="sig-sub">Series B closed Oct 2021. No new capital formation since.</p>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">Preference tower + exit simulator</div>
+  <div class="card-body">
+  <div class="tool-grid">
+
+    <!-- TOWER -->
+    <div class="tower-wrap" id="towerWrap">
+      <div class="tower" id="towerEl">
+
+        <!-- Seed — top of tower (most junior) -->
+        <div class="tier" style="height:26px;background:var(--c-s)">
+          <div class="tier-inner">
+            <span class="tier-name" style="color:rgba(3,23,56,0.85)">Seed</span>
+            <span class="tier-amt" style="color:rgba(3,23,56,0.55)">$580K</span>
+          </div>
+        </div>
+
+        <!-- Series A -->
+        <div class="tier" style="height:52px;background:var(--c-a)">
+          <div class="tier-inner">
+            <span class="tier-name" style="color:rgba(255,255,255,0.92)">Series A</span>
+            <span class="tier-amt" style="color:rgba(255,255,255,0.6)">$9.1M</span>
+          </div>
+        </div>
+
+        <!-- Series A-1 -->
+        <div class="tier" style="height:68px;background:var(--c-a1)">
+          <div class="tier-inner">
+            <span class="tier-name">Series A-1</span>
+            <span class="tier-amt">$11.5M</span>
+          </div>
+        </div>
+
+        <!-- A-2 GF — cream (inverted, stands out) -->
+        <div class="tier" style="height:28px;background:var(--c-a2g);border-top:2px solid rgba(3,23,56,0.2);border-bottom:2px solid rgba(3,23,56,0.2)">
+          <div class="tier-inner" style="flex-direction:row;align-items:center;gap:6px">
+            <span class="tier-name" style="color:#031738;font-weight:500">GOOD FRIENDS</span>
+            <span class="tier-amt" style="color:rgba(3,23,56,0.6)">$1.0M</span>
+          </div>
+        </div>
+
+        <!-- A-2 others -->
+        <div class="tier" style="height:68px;background:var(--c-a2o)">
+          <div class="tier-inner">
+            <span class="tier-name">Series A-2</span>
+            <span class="tier-amt">$16.0M</span>
+            <span class="tier-sub">Others</span>
+          </div>
+        </div>
+
+        <!-- Series B — bottom (most senior) -->
+        <div class="tier" style="height:190px;background:var(--c-b);border-top:none">
+          <div class="tier-inner">
+            <span class="tier-name" style="font-size:12px">Series B</span>
+            <span class="tier-amt" style="font-size:12px;color:rgba(255,255,255,0.75)">$112.7M</span>
+            <span class="tier-sub" style="margin-top:3px">Lone Pine Capital · 53%</span>
+          </div>
+        </div>
+
+      </div><!-- /tower -->
+
+      <!-- Unpaid overlay -->
+      <div class="unpaid-ovl" id="ovl" style="height:100%"></div>
+
+      <!-- Exit value line + label -->
+      <div class="exit-line" id="exLine" style="display:none">
+        <span class="exit-pill" id="exPill">$0M</span>
+      </div>
+
+      <!-- Threshold ticks (absolute positioned relative to tower-wrap) -->
+      <div class="tick" id="tick-b" style="top:190px">
+        <span class="tick-label">B clears · $112.7M</span>
+      </div>
+      <div class="tick" id="tick-gf" style="top:286px">
+        <span class="tick-label">GF paid · $129.7M</span>
+      </div>
+
+      <div class="tower-base"></div>
+      <p class="tower-note">Most senior at bottom · not to scale</p>
+    </div>
+
+    <!-- CONTROLS -->
+    <div>
+      <!-- Slider -->
+      <div class="slider-row">
+        <input type="range" id="sl" min="0" max="400" value="130" step="1" list="tks">
+        <datalist id="tks">
+          <option value="0"><option value="113"><option value="130"><option value="151"><option value="400">
+        </datalist>
+        <div class="num-input">
+          <input type="number" id="ni" value="130" min="0" max="400">
+          <span class="num-unit">$M</span>
+        </div>
+      </div>
+      <div class="slider-ctx">
+        <span id="aco"></span>
+        <span id="apb"></span>
+      </div>
+
+      <!-- Zone indicator -->
+      <div class="zone-box" id="zoneBox">
+                <div class="zone-title" id="zoneTitle"></div>
+        <div class="zone-desc" id="zoneDesc"></div>
+      </div>
+
+      <!-- Metric cards -->
+      <div class="mc-grid">
+        <div class="mc gf">
+          <p class="mc-l">GF Recovery</p>
+          <p class="mc-v" id="cg">—</p>
+        </div>
+        <div class="mc">
+          <p class="mc-l">% of cost</p>
+          <p class="mc-v" id="cp">—</p>
+          <p class="mc-s">Cost: $999,965</p>
+        </div>
+        <div class="mc">
+          <p class="mc-l">Stack covered</p>
+          <p class="mc-v" id="cc">—</p>
+          <p class="mc-s">of $150.9M</p>
+        </div>
+      </div>
+
+      <!-- Progress bars -->
+      <div class="prog-section">
+        <div class="prog-label-row">
+          <span class="prog-label">Series B preference</span>
+          <span class="prog-val dmono" id="pb-val">$0</span>
+        </div>
+        <div class="prog-bar"><div class="prog-fill" id="pb-fill" style="background:var(--c-b);width:0%"></div></div>
+
+        <div class="prog-label-row">
+          <span class="prog-label" style="font-weight:500;color:var(--navy)">GF preference (A-2)</span>
+          <span class="prog-val dmono" id="gf-val">$0</span>
+        </div>
+        <div class="prog-bar"><div class="prog-fill" id="gf-fill" style="background:var(--navy);width:0%"></div></div>
+
+        <div class="prog-label-row">
+          <span class="prog-label">All preferences</span>
+          <span class="prog-val dmono" id="all-val">$0</span>
+        </div>
+        <div class="prog-bar"><div class="prog-fill" id="all-fill" style="background:var(--navy);width:0%"></div></div>
+      </div>
+
+      <!-- Participating toggle -->
+      <div class="toggle-row">
+        <input type="checkbox" id="pt">
+        <label for="pt">Participating preferred (GF takes pref + pro-rata common)</label>
+      </div>
+
+    </div>
+  </div>
+  </div>
+</div>
+
+<!-- Scenarios -->
+<div class="card">
+  <div class="card-head">Probability-weighted scenarios</div>
+  <div class="card-body" style="padding-top:14px">
+  <div style="overflow-x:auto">
+  <table class="scen-tbl">
+    <thead><tr>
+      <th>Scenario</th><th>Prob.</th><th>Exit range</th><th style="text-align:right">GF recovery</th><th style="text-align:right">Weighted</th>
+    </tr></thead>
+    <tbody id="sb"></tbody>
+    <tfoot><tr class="scen-foot">
+      <td colspan="4" style="text-align:right">Probability-weighted recovery</td>
+      <td class="dmono" id="sw" style="text-align:right"></td>
+    </tr></tfoot>
+  </table>
+  </div>
+  </div>
+</div>
+
+<!-- Recommendation panel -->
+<div class="rec-panel">
+  <div>
+    <p class="rec-label">Recommended mark</p>
+    <p class="rec-value">$0</p>
+    <p class="rec-range">Defensible range: $0 &ndash; $250K &nbsp;&middot;&nbsp; Current mark ($1.0M) assumes clean exit above $129.7M</p>
+    <div class="fund-split">
+      <span class="fund-pill">Fund I &nbsp; $740,956 &nbsp; 25,132 shares</span>
+      <span class="fund-pill">Affiliates I &nbsp; $259,499 &nbsp; 8,804 shares</span>
+    </div>
+  </div>
+  <div class="rec-right">
+    <p class="rec-pw-label">Prob-weighted recovery</p>
+    <p class="rec-pw-val">~$338K</p>
+    <p class="rec-pw-sub">across 5 exit scenarios</p>
+  </div>
+</div>
+
+</main>
+
+<footer>
+  <p class="foot-txt">Source: Grin Technologies cap table Jan 10 2025 (Jordan Spataro, Grin CFO) &middot; PitchBook PBID 101785-96 &middot; Assumes 1x non-participating liq pref, standard seniority. Seniority + participation rights not confirmed from IRA. Prepared by Kelly O'Rourke, Good Friends VC.</p>
+</footer>
+
+<script>
+const LB=112730966,LA2=16999935,LA2G=999965,LA1=11499950,LAv=9064435,LS=579565;
+const LT=LB+LA2+LA1+LAv+LS;
+const LA2O=LA2-LA2G;
+const GFD=.00439,GFC=999965,GA2=.05882;
+const ACO=9.7,APB=14.5;
+
+// Tower tier heights (px from top, cumulative) — matches DOM order top→bottom
+// Seed: 26, A: 52, A-1: 68, A-2-GF: 28, A-2-other: 68, B: 190
+// Total tower height = 26+52+68+28+68+190 = 432px
+const TH=432;
+const TIERS=[
+  {lp:LS,  h:26,  top:0},
+  {lp:LAv, h:52,  top:26},
+  {lp:LA1, h:68,  top:78},
+  {lp:LA2G,h:28,  top:146},
+  {lp:LA2O,h:68,  top:174},
+  {lp:LB,  h:190, top:242},
+];
+// cumulative LP from bottom (B) upward:
+// B clears at LP_B → line is at top of B = 242px from top
+// A2o clears at LP_B+LA2O → 174px from top
+// A2gf clears at LP_B+LA2 → 146px from top
+// A1 clears at LP_B+LA2+LA1 → 78px from top
+// A clears at LP_B+LA2+LA1+LAv → 26px from top
+// S clears at LT → 0px from top
+
+const BRKPTS=[
+  {val:0,     pos:TH},
+  {val:LB,    pos:242},
+  {val:LB+LA2O,pos:174},
+  {val:LB+LA2, pos:146},
+  {val:LB+LA2+LA1, pos:78},
+  {val:LB+LA2+LA1+LAv, pos:26},
+  {val:LT,    pos:0},
+];
+
+function exitToPos(exitM){
+  const E=exitM*1e6;
+  if(E<=0) return TH;
+  if(E>=LT) return 0;
+  for(let i=1;i<BRKPTS.length;i++){
+    if(E<=BRKPTS[i].val){
+      const t=(E-BRKPTS[i-1].val)/(BRKPTS[i].val-BRKPTS[i-1].val);
+      return BRKPTS[i-1].pos + t*(BRKPTS[i].pos-BRKPTS[i-1].pos);
+    }
+  }
+  return 0;
+}
+
+function calc(em,pt){
+  const E=em*1e6; let r=E;
+  const bP=Math.min(r,LB); r=Math.max(0,r-LB);
+  const a2P=Math.min(r,LA2); r=Math.max(0,r-LA2);
+  const gA2=Math.min(a2P*GA2,LA2G);
+  const a1P=Math.min(r,LA1); r=Math.max(0,r-LA1);
+  const aP=Math.min(r,LAv); r=Math.max(0,r-LAv);
+  const sP=Math.min(r,LS); r=Math.max(0,r-LS);
+  const cmP=r,gCm=cmP*GFD;
+  let gR,gD;
+  if(E<=0){gR=0;gD='z';}
+  else if(pt){gR=gA2+gCm;gD='pt';}
+  else if(gCm>gA2&&E>LT){gR=gCm;gD='cv';}
+  else{gR=gA2;gD=gA2>0?'pr':'z';}
+  return{bP,a2P,gA2,a1P,aP,sP,cmP,gCm,gR,gD,cov:Math.min(100,E/LT*100)};
+}
+
+function fm(v){
+  if(v>=999500) return '$'+(v/1e6).toFixed(2)+'M';
+  if(v>=1000)   return '$'+Math.round(v/1e3)+'K';
+  if(v<1)       return '$0';
+  return '$'+Math.round(v);
+}
+
+const zones={
+  z:{cls:'z-zero', icon:'', title:'$0 — below Series B preference',
+     desc:'Lone Pine's B preference ($112.7M) is not fully covered. GF and all junior classes receive nothing.'},
+  pr:{cls:'z-partial', icon:'', title:'Partially recovering preference',
+      desc:'B is fully covered. GF receives 5.88% of proceeds allocated to the A-2 tranche, up to $1.0M.'},
+  full:{cls:'z-full', icon:'', title:'Full $1.0M preference recovered',
+        desc:'Both B and A-2 are fully covered. GF takes its $1.0M liquidation preference.'},
+  cv:{cls:'z-common', icon:'', title:'Converting to common',
+      desc:'Above the $377.7M conversion threshold. GF receives 0.439% of total exit proceeds.'},
+  pt:{cls:'z-full', icon:'', title:'Pref + pro-rata common (participating)',
+      desc:'Participating preferred: GF takes the $1M preference AND 0.439% of the remaining common pool.'},
+};
+
+function getZone(d,em){
+  if(d.gD==='cv') return 'cv';
+  if(d.gD==='pt') return 'pt';
+  if(d.gD==='z')  return 'z';
+  if(d.gA2>=LA2G*.99) return 'full';
+  return 'pr';
+}
+
+function update(){
+  const em=Math.max(0,Math.min(400,+document.getElementById('sl').value||0));
+  const pt=document.getElementById('pt').checked;
+  const d=calc(em,pt);
+
+  // ARR context
+  document.getElementById('aco').textContent=(em/ACO).toFixed(1)+'× co. ARR ($'+ACO+'M)';
+  document.getElementById('apb').textContent=(em/APB).toFixed(1)+'× PitchBook ARR ($'+APB+'M)';
+
+  // Tower
+  const linePos=exitToPos(em);
+  const ovl=document.getElementById('ovl');
+  ovl.style.height=linePos+'px';
+
+  const exLine=document.getElementById('exLine');
+  const exPill=document.getElementById('exPill');
+  if(em<=0){
+    exLine.style.display='none';
+  } else {
+    exLine.style.display='block';
+    exLine.style.top=(linePos-1)+'px';
+    exPill.textContent='$'+em+'M';
+  }
+
+  // Zone box
+  const z=getZone(d,em);
+  const zi=zones[z];
+  const zb=document.getElementById('zoneBox');
+  zb.className='zone-box '+zi.cls;
+    document.getElementById('zoneTitle').textContent=zi.title;
+  document.getElementById('zoneDesc').textContent=zi.desc;
+
+  // Metric cards
+  document.getElementById('cg').textContent=fm(d.gR);
+  document.getElementById('cp').textContent=(d.gR/GFC*100).toFixed(1)+'%';
+  document.getElementById('cc').textContent=d.cov.toFixed(1)+'%';
+
+  // Progress bars
+  const bPct=Math.min(100,d.bP/LB*100);
+  const gfPct=Math.min(100,d.gA2/LA2G*100);
+  const allPct=d.cov;
+  document.getElementById('pb-val').textContent=fm(d.bP);
+  document.getElementById('gf-val').textContent=fm(d.gA2);
+  document.getElementById('all-val').textContent=fm(Math.min(em*1e6,LT));
+  document.getElementById('pb-fill').style.width=bPct+'%';
+  document.getElementById('gf-fill').style.width=gfPct+'%';
+  document.getElementById('all-fill').style.width=allPct+'%';
+}
+
+function buildScen(){
+  const mid=calc(120,false);
+  const sc=[
+    {n:'Wind-down / zero',p:.20,r:'$0',gf:0,note:'Cash exhausted, no buyer'},
+    {n:'Distressed sale',p:.30,r:'$50M&ndash;$80M',gf:0,note:'Below B pref floor'},
+    {n:'Partial recovery',p:.25,r:'$100M&ndash;$129M',gf:mid.gR,note:'Avg at $120M midpoint'},
+    {n:'Full preference',p:.20,r:'$130M&ndash;$200M',gf:LA2G,note:'Clean M&amp;A exit'},
+    {n:'Upside ($200M+)',p:.05,r:'$200M+',gf:LA2G,note:'Pref still better than common'},
+  ];
+  let tot=0;
+  document.getElementById('sb').innerHTML=sc.map(s=>{
+    const w=s.p*s.gf; tot+=w;
+    return`<tr>
+      <td>${s.n}<br><span class="muted" style="font-size:11px">${s.note}</span></td>
+      <td class="dmono">${(s.p*100).toFixed(0)}%</td>
+      <td class="muted" style="font-size:12px">${s.r}</td>
+      <td class="dmono" style="text-align:right">${fm(s.gf)}</td>
+      <td class="dmono" style="text-align:right">${fm(w)}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('sw').textContent=fm(tot);
+}
+
+// Position threshold ticks relative to tower element
+function positionTicks(){
+  const tw=document.getElementById('towerWrap');
+  const towerEl=document.getElementById('towerEl');
+  const tRect=towerEl.getBoundingClientRect();
+  const wRect=tw.getBoundingClientRect();
+  const towerTop=tRect.top-wRect.top;
+
+  // B clears: line at 242px from top of tower
+  const tickB=document.getElementById('tick-b');
+  tickB.style.top=(towerTop+242)+'px';
+
+  // GF fully paid: line at 146px from top of tower
+  const tickGF=document.getElementById('tick-gf');
+  tickGF.style.top=(towerTop+146)+'px';
+}
+
+// Wire controls
+const sl=document.getElementById('sl');
+const ni=document.getElementById('ni');
+sl.addEventListener('input',()=>{ni.value=sl.value;update();});
+ni.addEventListener('change',()=>{const v=Math.min(400,Math.max(0,+ni.value||0));sl.value=v;ni.value=v;update();});
+document.getElementById('pt').addEventListener('change',update);
+
+buildScen();
+update();
+setTimeout(positionTicks,100);
+window.addEventListener('resize',positionTicks);
+</script>
+</body>
+</html>
