@@ -100,7 +100,7 @@ footer{background:var(--navy);padding:14px 40px}
   header,footer{padding:16px}
   main{padding:18px 14px 40px}
   .sigs{grid-template-columns:1fr 1fr}
-  .sigs .sig:last-child{grid-column:1/-1}
+  .sigs .sig:nth-child(3),.sigs .sig:nth-child(4){grid-column:span 1}
   .rg{grid-template-columns:1fr}
 }
 </style>
@@ -111,11 +111,12 @@ footer{background:var(--navy);padding:14px 40px}
   <div class="h-me">April 14, 2026<br>Cap table: Jan 10, 2025</div>
 </header>
 <main>
-<div class="ctx">GF invested <strong>$1.0M</strong> in Grin Series A-2 (May 2021). There is <strong>$150.9M</strong> of liquidation preference ahead of common &mdash; Lone Pine holds $112.7M of Series B and gets paid first. GF does not receive a dollar until Lone Pine is fully paid. Use the slider to see GF recovery at any exit value.</div>
-<div class="sigs">
-  <div class="sig"><p class="sig-l">ARR at investment</p><p class="sig-v">$13.8M</p><p class="sig-n">ARR today: $9.7M &mdash; below entry</p></div>
-  <div class="sig"><p class="sig-l">ARR at Series B peak</p><p class="sig-v">~$30M</p><p class="sig-n">68% decline since Oct 2021</p></div>
-  <div class="sig"><p class="sig-l">Months since last raise</p><p class="sig-v">50+</p><p class="sig-n">3 layoffs: Nov&rsquo;22, Mar&rsquo;23, Apr&rsquo;24</p></div>
+<div class="ctx">GF invested <strong>$1.0M</strong> in Grin Series A-2 (May 2021). There is <strong>$150.9M</strong> of liquidation preference ahead of common &mdash; Lone Pine holds $112.7M of Series B and gets paid first. GF does not receive a dollar until Lone Pine is fully paid. ARR data confirmed today via Grin quarterly health check (Jordan Spataro, CFO). Use the slider to see GF recovery at any exit value.</div>
+<div class="sigs" style="grid-template-columns:repeat(4,1fr)">
+  <div class="sig"><p class="sig-l">ARR at investment</p><p class="sig-v">$13.8M</p><p class="sig-n">May 2021 &mdash; Series A-2 entry</p></div>
+  <div class="sig"><p class="sig-l">ARR at peak</p><p class="sig-v">~$30M</p><p class="sig-n">Oct 2021, Series B close</p></div>
+  <div class="sig" style="border-top-color:#031738;background:rgba(3,23,56,0.04)"><p class="sig-l" style="color:#031738;opacity:.7">Current ARR</p><p class="sig-v" style="font-size:17px">$9.7M</p><p class="sig-n">Apr 2026 &mdash; below entry point. &minus;68% from peak.</p></div>
+  <div class="sig"><p class="sig-l">Cash / runway</p><p class="sig-v">$10.9M</p><p class="sig-n">48 mo. runway &middot; $72K/mo net burn. Confirmed Apr 14, 2026.</p></div>
 </div>
 <div class="card">
   <div class="card-h">Preference stack &mdash; drag slider to set exit value</div>
