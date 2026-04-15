@@ -103,9 +103,30 @@ footer{background:var(--navy);padding:14px 40px}
   .sigs .sig:nth-child(3),.sigs .sig:nth-child(4){grid-column:span 1}
   .rg{grid-template-columns:1fr}
 }
+
+/* Password gate */
+#gate{position:fixed;inset:0;background:var(--navy);display:flex;align-items:center;justify-content:center;z-index:9999}
+.gate-box{text-align:center;padding:40px 36px;background:rgba(255,245,230,0.05);border:1px solid rgba(255,245,230,0.12);border-radius:8px;min-width:280px}
+.gate-logo{font-family:'Recoleta',Georgia,serif;font-size:28px;color:var(--cream);margin-bottom:6px}
+.gate-sub{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,245,230,.35);margin-bottom:28px}
+.gate-input{width:100%;padding:10px 14px;background:rgba(255,245,230,.07);border:1px solid rgba(255,245,230,.18);border-radius:4px;font-family:'DM Mono',monospace;font-size:16px;color:var(--cream);text-align:center;letter-spacing:.2em;outline:none;margin-bottom:10px}
+.gate-input::placeholder{color:rgba(255,245,230,.25);letter-spacing:.1em}
+.gate-input:focus{border-color:rgba(255,245,230,.5)}
+.gate-btn{width:100%;padding:10px;background:var(--cream);color:var(--navy);border:none;border-radius:4px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;letter-spacing:.04em}
+.gate-btn:hover{opacity:.9}
+.gate-err{font-size:11.5px;color:rgba(255,245,230,.45);margin-top:8px;min-height:16px}
 </style>
 </head>
 <body>
+<div id="gate">
+  <div class="gate-box">
+    <p class="gate-logo">Good Friends</p>
+    <p class="gate-sub">Grin &middot; Waterfall Analysis</p>
+    <input class="gate-input" id="gateInput" type="password" placeholder="Password" autocomplete="off" autocorrect="off" spellcheck="false">
+    <button class="gate-btn" id="gateBtn">Enter</button>
+    <p class="gate-err" id="gateErr"></p>
+  </div>
+</div>
 <header>
   <div><p class="h-ey">Good Friends Venture Capital &middot; Fund I</p><h1 class="h-ti">Grin &mdash; Liquidation Preference Waterfall</h1></div>
   <div class="h-me">April 14, 2026<br>Cap table: Jan 10, 2025</div>
@@ -266,6 +287,30 @@ sl.addEventListener('input',()=>{ni.value=sl.value;update();});
 ni.addEventListener('change',()=>{const v=Math.min(400,Math.max(0,+ni.value||0));sl.value=Math.min(v,210);ni.value=v;update();});
 window.addEventListener('resize',()=>update());
 buildScen();update();
+
+// Password gate
+(function(){
+  const PASS='GF26';
+  const gate=document.getElementById('gate');
+  const inp=document.getElementById('gateInput');
+  const btn=document.getElementById('gateBtn');
+  const err=document.getElementById('gateErr');
+  function attempt(){
+    if(inp.value===PASS){
+      gate.style.opacity='0';
+      gate.style.transition='opacity .3s';
+      setTimeout(()=>{gate.style.display='none';},300);
+    } else {
+      err.textContent='Incorrect password.';
+      inp.value='';
+      inp.focus();
+      setTimeout(()=>{err.textContent='';},2000);
+    }
+  }
+  btn.addEventListener('click',attempt);
+  inp.addEventListener('keydown',e=>{if(e.key==='Enter')attempt();});
+  inp.focus();
+})();
 </script>
 </body>
 </html>
